@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AI Assignment Generator"
+description = "An AI-assisted assignment creation app for educators, with a guided chat interface, profile settings, authentication, and export tools."
+version = "1.0.0"
+id = "artifacts/ai-assignment-generator"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18145
+
+[services.development]
+run = "pnpm --filter @workspace/ai-assignment-generator run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ai-assignment-generator", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ai-assignment-generator/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18145"
+BASE_PATH = "/"
