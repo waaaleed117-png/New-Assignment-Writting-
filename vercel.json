@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "https://backend-api-server-i4uw.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
