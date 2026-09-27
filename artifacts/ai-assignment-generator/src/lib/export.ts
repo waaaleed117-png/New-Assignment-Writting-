@@ -170,7 +170,6 @@ export async function exportToPDF(
       scrollY: 0,
     })
 
-    const imageData = canvas.toDataURL('image/jpeg', 0.92)
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'in',
@@ -178,18 +177,44 @@ export async function exportToPDF(
       compress: true,
     })
 
-    const imageHeight = (canvas.height * content.width) / canvas.width
-    const totalPages = Math.max(1, Math.ceil(imageHeight / content.height))
+    const pagePixels = Math.floor((canvas.width * content.height) / content.width)
+    const totalPages = Math.max(1, Math.ceil(canvas.height / pagePixels))
 
     for (let page = 0; page < totalPages; page += 1) {
       if (page > 0) doc.addPage()
+
+      // Slice the canvas to prevent image bleeding into the margins
+      const sliceCanvas = document.createElement('canvas')
+      sliceCanvas.width = canvas.width
+      sliceCanvas.height = Math.min(pagePixels, canvas.height - page * pagePixels)
+
+      const ctx = sliceCanvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
+        ctx.drawImage(
+          canvas,
+          0,
+          page * pagePixels,
+          canvas.width,
+          sliceCanvas.height,
+          0,
+          0,
+          sliceCanvas.width,
+          sliceCanvas.height
+        )
+      }
+
+      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92)
+      const sliceHeightInches = (sliceCanvas.height * content.width) / sliceCanvas.width
+
       doc.addImage(
-        imageData,
+        sliceData,
         'JPEG',
         pageMargin.left,
-        pageMargin.top - page * content.height,
+        pageMargin.top,
         content.width,
-        imageHeight,
+        sliceHeightInches,
         undefined,
         'FAST'
       )
@@ -280,10 +305,10 @@ export function normalizeInlineStyles(root: HTMLElement) {
     const verticalMargin = c.contains('my-2')
       ? '0.5rem'
       : c.contains('my-3')
-        ? '0.75rem'
-        : c.contains('my-4')
-          ? '1rem'
-          : null
+      ? '0.75rem'
+      : c.contains('my-4')
+      ? '1rem'
+      : null
     if (verticalMargin) {
       style.marginTop = verticalMargin
       style.marginBottom = verticalMargin
@@ -291,22 +316,22 @@ export function normalizeInlineStyles(root: HTMLElement) {
     const marginTop = c.contains('mt-2')
       ? '0.5rem'
       : c.contains('mt-4')
-        ? '1rem'
-        : c.contains('mt-6')
-          ? '1.5rem'
-          : c.contains('mt-8')
-            ? '2rem'
-            : null
+      ? '1rem'
+      : c.contains('mt-6')
+      ? '1.5rem'
+      : c.contains('mt-8')
+      ? '2rem'
+      : null
     if (marginTop) style.marginTop = marginTop
     const marginBottom = c.contains('mb-2')
       ? '0.5rem'
       : c.contains('mb-3')
-        ? '0.75rem'
-        : c.contains('mb-4')
-          ? '1rem'
-          : c.contains('mb-8')
-            ? '2rem'
-            : null
+      ? '0.75rem'
+      : c.contains('mb-4')
+      ? '1rem'
+      : c.contains('mb-8')
+      ? '2rem'
+      : null
     if (marginBottom) style.marginBottom = marginBottom
 
     if (c.length > 0) node.removeAttribute('class')
@@ -355,10 +380,10 @@ export async function exportToDocx(
             const imageType = contentType.includes('png')
               ? 'png'
               : contentType.includes('jpeg') || contentType.includes('jpg')
-                ? 'jpg'
-                : contentType.includes('svg')
-                  ? 'svg'
-                  : 'png'
+              ? 'jpg'
+              : contentType.includes('svg')
+              ? 'svg'
+              : 'png'
             if (imageType === 'svg') {
               // DOCX only supports SVG images with a PNG fallback, which we
               // cannot produce client-side, so skip embedding this image.
