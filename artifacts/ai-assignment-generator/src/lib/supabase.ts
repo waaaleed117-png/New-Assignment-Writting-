@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { FormattingSettings } from '@/lib/types'
 
 const url = import.meta.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const anonKey = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -34,10 +35,10 @@ export async function getUserChats(userId: string) {
   return supabaseClient.from('chats').select('*').eq('user_id', userId).order('created_at', { ascending: false })
 }
 
-export async function createChat(userId: string, title: string) {
+export async function createChat(userId: string, title: string, formatting?: FormattingSettings) {
   const supabaseClient = getSupabaseClient()
   if (!supabaseClient) return { data: null, error: new Error('Database service is not configured') }
-  return supabaseClient.from('chats').insert({ user_id: userId, title }).select().single()
+  return supabaseClient.from('chats').insert({ user_id: userId, title, formatting }).select().single()
 }
 
 export async function deleteChat(chatId: string) {
@@ -58,8 +59,13 @@ export async function addMessage(chatId: string, role: 'user' | 'assistant', con
   return supabaseClient.from('messages').insert({ id: crypto.randomUUID(), chat_id: chatId, role, content }).select().single()
 }
 
-export async function updateChat(chatId: string, title: string) {
+export async function updateChat(chatId: string, title?: string, formatting?: FormattingSettings) {
   const supabaseClient = getSupabaseClient()
   if (!supabaseClient) return { data: null, error: new Error('Database service is not configured') }
-  return supabaseClient.from('chats').update({ title }).eq('id', chatId).select().single()
+  
+  const updateData: any = {}
+  if (title !== undefined) updateData.title = title
+  if (formatting !== undefined) updateData.formatting = formatting
+
+  return supabaseClient.from('chats').update(updateData).eq('id', chatId).select().single()
 }
