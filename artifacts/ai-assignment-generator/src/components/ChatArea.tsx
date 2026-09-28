@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
-import { addMessage, createChat, getChatMessages, updateChat } from '@/lib/supabase'
+import { addMessage, createChat, getChatMessages, updateChat, getSupabaseClient } from '@/lib/supabase'
 import type { Attachment, Chat, Message, FormattingSettings } from '@/lib/types'
 import { defaultFormatting } from '@/lib/formatting'
 import ChatInput from '@/components/ChatInput'
@@ -26,12 +26,23 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
 
   useEffect(() => {
     let active = true
-    async function loadMessages() {
+    async function loadChatData() {
       if (!chatId || chatId.startsWith('local-')) {
         setMessages([])
+        setFormatting({ ...defaultFormatting })
         return
       }
       setLoadingMessages(true)
+      
+      // Messages aur chat ki saved formatting dono load karna
+      const supabaseClient = getSupabaseClient()
+      if (supabaseClient) {
+        const chatResult = await supabaseClient.from('chats').select('formatting').eq('id', chatId).single()
+        if (chatResult.data && chatResult.data.formatting && active) {
+          setFormatting(chatResult.data.formatting)
+        }
+      }
+
       const result = await getChatMessages(chatId)
       if (active) {
         if (result.error) toast.error('Could not load this assignment history')
@@ -39,7 +50,7 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
         setLoadingMessages(false)
       }
     }
-    void loadMessages()
+    void loadChatData()
     return () => { active = false }
   }, [chatId])
 
@@ -58,19 +69,17 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
         toast.error('Please sign in before sending a message')
         return
       }
-      const chatResult = await createChat(session.user.id, title)
+      // Nayi chat banate waqt formatting database mein save karna
+      const chatResult = await createChat(session.user.id, title, nextFormatting)
       if (chatResult.error || !chatResult.data) {
         toast.error('Could not create this assignment')
         return
       }
       currentChatId = chatResult.data.id
       onChatCreated?.(chatResult.data as Chat)
-    } else if (!currentChatId.startsWith('local-') && messages.length === 0) {
-      const titleResult = await updateChat(currentChatId, title)
-      if (titleResult.error) {
-        toast.error('Could not update this assignment title')
-        return
-      }
+    } else if (!currentChatId.startsWith('local-')) {
+      // Existing chat mein message bhejte waqt formatting update/save karna
+      await updateChat(currentChatId, messages.length === 0 ? title : undefined, nextFormatting)
     }
     if (!currentChatId) return
 
