@@ -185,21 +185,27 @@ function classifyError(error: any): { action: RotationAction; reason: string } {
   return { action: "fatal", reason: redactSecrets(message) };
 }
 
-async function generateOnce(
+// Yahan generateOnce ki jagah stream generator function banaya hai
+async function* generateOnceStream(
   client: GoogleGenerativeAI,
   modelName: string,
   parts: Content["parts"],
-): Promise<string> {
+): AsyncGenerator<string, void, unknown> {
   const model = client.getGenerativeModel({ model: modelName });
-  const result = await model.generateContent({ contents: [{ role: "user", parts }] });
-  const response = await result.response;
-  const text = response.text();
+  const result = await model.generateContentStream({ contents: [{ role: "user", parts }] });
 
-  if (!text || text.trim().length === 0) {
-    throw new EmptyResponseError("Gemini returned an empty response.");
+  let hasOutput = false;
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) {
+      hasOutput = true;
+      yield text; // Jaise hi naya word aaye usko yield kar do
+    }
   }
 
-  return text;
+  if (!hasOutput) {
+    throw new EmptyResponseError("Gemini returned an empty response.");
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -215,13 +221,14 @@ function detectRequestedPages(prompt: string): number | null {
   return match ? clamp(Number(match[1]), 1, 20) : null;
 }
 
-export async function generateAssignment(
+// Return type AsyncGenerator kar diya gaya hai
+export async function* generateAssignment(
   prompt: string,
   pageLength: number = 0,
   attachmentContext?: string,
   formatting?: FormattingSettings,
   attachments: AttachmentPayload[] = [],
-): Promise<string> {
+): AsyncGenerator<string, void, unknown> {
   // The Pages dropdown is the source of truth: an explicit selection always
   // wins, even if the prompt text happens to mention a different count. Only
   // when nothing was selected do we fall back to the text, then to 2.
@@ -245,7 +252,7 @@ export async function generateAssignment(
 Prompt: ${prompt}
 Target Length: EXACTLY ${pages} ${pages === 1 ? "page" : "pages"}${requestedInPrompt ? " (the user asked for this page count directly in their message)" : " (the user chose this page count in the Pages dropdown, and it must be followed exactly)"}. This is a strict, hard requirement that cannot be violated. This target length is authoritative: if the Prompt above mentions any other page or word count, ignore it and follow the target length stated here. The finished assignment MUST be exactly ${pages} ${pages === 1 ? "page" : "pages"} long — no fewer and no more. Write approximately ${pages * 250} to ${pages * 300} words (both numbers are required to be within this range); never write fewer than ${pages * 250} words or more than ${pages * 300} words.
 ${attachmentContext ? `Context from attachments: ${attachmentContext}` : ""}
-${imageParts.length > 0 ? `The user has attached ${imageParts.length} image(s): ${attachments.filter((a) => a.mimeType.startsWith("image/")).map((a) => a.name).join(", ")}. Carefully READ and ANALYZE every attached image from top to bottom before writing. Base the entire assignment on what is actually visible in the image(s): every heading, title, sentence, keyword, number, table, list, and subject. If the prompt is short or generic, the image content itself defines the topic. Cover everything meaningful you can see.` : ""}
+${imageParts.length > 0 ? `The user has attached ${imageParts.length} image(s):${attachments.filter((a) => a.mimeType.startsWith("image/")).map((a) => a.name).join(", ")}. Carefully READ and ANALYZE every attached image from top to bottom before writing. Base the entire assignment on what is actually visible in the image(s): every heading, title, sentence, keyword, number, table, list, and subject. If the prompt is short or generic, the image content itself defines the topic. Cover everything meaningful you can see.` : ""}
 
 Rules:
 1. Use very simple, natural English that a student can easily read. Prefer short sentences and common words. Do not use unnecessarily difficult or overly professional vocabulary.
@@ -275,7 +282,9 @@ Please generate the complete assignment now:`;
 
     for (const modelName of models) {
       try {
-        const text = await generateOnce(client, modelName, parts);
+        // Stream ko yahan collect aur yield kiya ja raha hai
+        const stream = generateOnceStream(client, modelName, parts);
+        yield* stream;
 
         slot.state.cooldownUntil = 0;
         if (modelName !== primaryModel) {
@@ -283,7 +292,7 @@ Please generate the complete assignment now:`;
             `[Gemini] ${slot.label} succeeded with fallback model "${modelName}".`,
           );
         }
-        return text;
+        return; // Success! Ab yahan se wapis return kar jao
       } catch (error: any) {
         const message: string = error?.message || String(error);
         const { action, reason } = classifyError(error);
