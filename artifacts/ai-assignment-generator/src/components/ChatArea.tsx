@@ -95,7 +95,7 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
     }
 
     try {
-      const response = await fetch('/api/generate-assignment', {
+      const response = await fetch('https://backend-api-server-i4uw.onrender.com/api/generate-assignment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,7 +141,6 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         
-        // Keep the last potentially incomplete line in the buffer
         buffer = lines.pop() || ''
 
         for (const line of lines) {
@@ -170,7 +169,6 @@ export function ChatArea({ chatId, onChatCreated, onMessageSaved }: ChatAreaProp
         }
       }
 
-      // Jab stream complete ho jaye, tab Supabase mein message save karein
       if (!aiText) throw new Error('The generated assignment was empty')
       
       const assistantMessageResult = await addMessage(currentChatId, 'assistant', aiText)
