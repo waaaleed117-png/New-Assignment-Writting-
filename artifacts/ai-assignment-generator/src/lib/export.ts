@@ -1,3 +1,7 @@
+Ai-assignment-generator/src/lib/export.ts
+
+Yalo yr iska code achy sy dkeh kr is msly ko hmesha kalia fix krdo yr plz or plz koi error na create kr dena ab bs jo kaha ha wohi krna
+
 import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
@@ -139,16 +143,6 @@ export async function exportToPDF(
     `font-family: ${formatting.bodyFont}, sans-serif`,
     'line-height: 1.6',
   ].join('; ')
-
-  // Page break fix: Elements ko beech mein se cut hone se bachane ke liye CSS rules inject kar rahe hain
-  const breakStyle = document.createElement('style')
-  breakStyle.innerHTML = `
-    p, h1, h2, h3, h4, h5, h6, li, blockquote, figure {
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-  `
-  container.appendChild(breakStyle)
   document.body.appendChild(container)
 
   normalizeInlineStyles(container)
