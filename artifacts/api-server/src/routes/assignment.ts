@@ -73,7 +73,12 @@ router.post("/generate-assignment", async (req, res) => {
           }
         : undefined;
 
-    const content = await generateAssignment(
+    // Set streaming headers taake Vercel connection drop na kare
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const stream = generateAssignment(
       rawPrompt,
       Math.min(Math.max(pageLength, 1), 20),
       attachmentContext,
@@ -81,11 +86,29 @@ router.post("/generate-assignment", async (req, res) => {
       attachments,
     );
 
-    return res.json({ content });
+    // Stream ke chunks ko read kar ke bhejna
+    for await (const chunk of stream) {
+      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+
+    // Response complete hone par signal
+    res.write("data: [DONE]\n\n");
+    res.end();
+
   } catch (error) {
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : "Failed to generate assignment",
-    });
+    // Agar headers already bheje ja chuke hain, toh stream mein error bhejo
+    if (res.headersSent) {
+      res.write(
+        `data: ${JSON.stringify({
+          error: error instanceof Error ? error.message : "Failed to generate assignment",
+        })}\n\n`
+      );
+      res.end();
+    } else {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to generate assignment",
+      });
+    }
   }
 });
 
