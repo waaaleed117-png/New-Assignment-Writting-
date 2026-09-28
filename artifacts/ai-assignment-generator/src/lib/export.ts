@@ -1,7 +1,3 @@
-Ai-assignment-generator/src/lib/export.ts
-
-Yalo yr iska code achy sy dkeh kr is msly ko hmesha kalia fix krdo yr plz or plz koi error na create kr dena ab bs jo kaha ha wohi krna
-
 import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
