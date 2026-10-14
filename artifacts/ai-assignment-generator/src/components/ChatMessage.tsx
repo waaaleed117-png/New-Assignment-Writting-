@@ -22,7 +22,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content)
     setCopied(true)
-    toast.success('Assignment copied')
+    // Notification text change kiya hai user aur AI ke hisaab se
+    toast.success(isUser ? 'Message copied' : 'Assignment copied')
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -52,7 +53,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   return (
     <>
     <motion.div
-      className={`flex gap-2 sm:gap-4 ${isUser ? 'justify-end' : 'items-start justify-start'}`}
+      // Yahan mb-6 add kiya hai taake messages aapas mein na jurein
+      className={`flex gap-2 sm:gap-4 mb-6 ${isUser ? 'justify-end' : 'items-start justify-start'}`}
       initial={{ opacity: 0, x: isUser ? 20 : -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3 }}
@@ -75,7 +77,20 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
         {/* Message Content */}
         <div className="prose dark:prose-invert prose-sm max-w-none">
           {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            // User ke message ke andar ab copy button add kar diya gaya hai
+            <div className="flex flex-col gap-2">
+              <p className="whitespace-pre-wrap">{message.content}</p>
+              <div className="flex justify-end border-t border-white/20 pt-2 mt-1">
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-white/80 transition-colors hover:text-white"
+                  title="Copy your message"
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
           ) : (
             <div
               dangerouslySetInnerHTML={{
@@ -135,8 +150,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
       </div>
     </motion.div>
     {showPreview && !isUser && createPortal(
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowPreview(false)}>
-        <div role="dialog" aria-modal="true" aria-labelledby="preview-title" className="flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-slate-900/90 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
+        <div role="dialog" aria-modal="true" aria-labelledby="preview-title" className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-slate-900/90 shadow-2xl" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-center justify-between gap-4 border-b border-white/10 p-4 sm:p-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-400">Document preview</p>
@@ -145,7 +160,7 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
             <button type="button" onClick={() => setShowPreview(false)} className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition hover:bg-white/10" aria-label="Close preview"><X size={18} /></button>
           </div>
           <div className="overflow-y-auto p-4 sm:p-6">
-            <article className="preview-paper prose prose-sm mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 sm:p-10 text-slate-900 shadow-lg sm:rounded-3xl"
+            <article className="preview-paper prose prose-sm mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-lg sm:p-10 sm:rounded-3xl"
               dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content, formatting) }}
             />
           </div>
