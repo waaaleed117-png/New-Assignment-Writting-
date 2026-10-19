@@ -1,4 +1,4 @@
-import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, BorderStyle } from 'docx'
+import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, BorderStyle, PageBorderOffsetFrom } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -11,19 +11,11 @@ import {
 } from '@/lib/formatting'
 import { normalizeAssignmentContent, stripInlineMarkers } from '@/lib/content'
 
-/** CSS pixels per inch, so a rendered px matches its physical size on paper. */
 const CSS_PX_PER_INCH = 96
-/** DOCX stores page geometry in twips (1 inch = 1440 twips). */
 const TWIPS_PER_INCH = 1440
-/** DOCX image geometry is expressed in pixels at 96 dpi. */
 const DOCX_IMAGE_MAX_WIDTH_PX = 560
-/** Every exported glyph is forced to pure black, whatever the source markup. */
 const DOCX_TEXT_COLOR = '000000'
 
-/**
- * Word stores font size in half-points, so a 12pt selection must be written as
- * 24. Keeping the conversion in one place stops the units being guessed.
- */
 function toHalfPoints(points: number): number {
   return Math.round(points * 2)
 }
@@ -44,7 +36,6 @@ function headingParagraph(
         font: formatting.headingFont,
         size: toHalfPoints(formatting.headingSize),
         color: DOCX_TEXT_COLOR,
-        // Bold apply karna agar setting true ho, warna false
         bold: formatting.headingBold,
       }),
     ],
@@ -70,24 +61,29 @@ function bodyParagraph(
   })
 }
 
-/** DOCX border map */
+// DOCX Border fixing - Properly structure the page borders properties
 function getDocxBorder(borderId: PageBorderId) {
   if (borderId === 'none') return undefined;
 
   const mapping: Record<string, typeof BorderStyle[keyof typeof BorderStyle]> = {
     solid: BorderStyle.SINGLE,
-    dashed: BorderStyle.DASH_DOT_STROKED, // Or DASHED based on preference
+    dashed: BorderStyle.DASHED, 
     dotted: BorderStyle.DOTTED,
     double: BorderStyle.DOUBLE,
   }
 
   const borderStyle = mapping[borderId] || BorderStyle.SINGLE;
+  // Size 12 means 1.5pt in Word. Same look as standard assignment borders.
+  const bConfig = { style: borderStyle, size: 12, color: '000000', space: 24 };
 
   return {
-    top: { style: borderStyle, size: 24, color: '000000', space: 24 },
-    bottom: { style: borderStyle, size: 24, color: '000000', space: 24 },
-    left: { style: borderStyle, size: 24, color: '000000', space: 24 },
-    right: { style: borderStyle, size: 24, color: '000000', space: 24 },
+    pageBorders: {
+      offsetFrom: PageBorderOffsetFrom.PAGE,
+    },
+    top: bConfig,
+    bottom: bConfig,
+    left: bConfig,
+    right: bConfig,
   }
 }
 
@@ -144,8 +140,6 @@ export async function exportToPDF(
     'position: fixed',
     'left: -10000px',
     'top: 0',
-    // Render at the real printable width so the page size and margins are
-    // physically reflected in the PDF instead of being scaled away.
     `width: ${Math.round(content.width * CSS_PX_PER_INCH)}px`,
     'color: #111827',
     'background: #ffffff',
@@ -157,7 +151,6 @@ export async function exportToPDF(
 
   normalizeInlineStyles(container)
 
-  // Wait for remote diagrams to load before rendering.
   const images = Array.from(container.querySelectorAll('img'))
   await Promise.all(
     images.map(
@@ -197,7 +190,6 @@ export async function exportToPDF(
     for (let page = 0; page < totalPages; page += 1) {
       if (page > 0) doc.addPage()
 
-      // Slice the canvas to prevent image bleeding into the margins
       const sliceCanvas = document.createElement('canvas')
       sliceCanvas.width = canvas.width
       sliceCanvas.height = Math.min(pagePixels, canvas.height - page * pagePixels)
@@ -233,36 +225,34 @@ export async function exportToPDF(
         'FAST'
       )
       
-      // PDF Border drawing logic if selected
+      // PDF Border logic - Moved to the outer edge of the page (0.33 inches from edges)
       if (formatting.pageBorder !== 'none') {
-        const borderPadding = 0.2; // Inches
-        const rectX = pageMargin.left - borderPadding;
-        const rectY = pageMargin.top - borderPadding;
-        const rectW = content.width + (borderPadding * 2);
-        const rectH = pageSize.height - (pageMargin.top + pageMargin.bottom) + (borderPadding * 2);
+        const marginFromEdge = 0.33; 
+        const rectX = marginFromEdge;
+        const rectY = marginFromEdge;
+        const rectW = pageSize.width - (marginFromEdge * 2);
+        const rectH = pageSize.height - (marginFromEdge * 2);
         
-        doc.setDrawColor(0); // Black
-        doc.setLineWidth(0.02);
+        doc.setDrawColor(0); 
+        doc.setLineWidth(0.015);
         
         if (formatting.pageBorder === 'solid') {
            doc.rect(rectX, rectY, rectW, rectH);
         } else if (formatting.pageBorder === 'double') {
            doc.rect(rectX, rectY, rectW, rectH);
-           doc.rect(rectX + 0.05, rectY + 0.05, rectW - 0.1, rectH - 0.1);
+           doc.rect(rectX + 0.04, rectY + 0.04, rectW - 0.08, rectH - 0.08);
         }
         else {
-           // For dashed and dotted jsPDF does not have a built in 'dash' that works easily across all versions via simple string. 
-           // Advanced dash logic is required for jsPDF, but as a fallback for now we draw solid, or if supported, we can use setLineDash.
            if (typeof doc.setLineDash === 'function') {
                if (formatting.pageBorder === 'dashed') {
                    doc.setLineDash([0.1, 0.1], 0);
                } else if (formatting.pageBorder === 'dotted') {
-                   doc.setLineDash([0.02, 0.05], 0);
+                   doc.setLineDash([0.03, 0.05], 0);
                }
            }
            doc.rect(rectX, rectY, rectW, rectH);
            if (typeof doc.setLineDash === 'function') {
-               doc.setLineDash([], 0); // reset
+               doc.setLineDash([], 0);
            }
         }
       }
@@ -338,8 +328,6 @@ export function normalizeInlineStyles(root: HTMLElement) {
     if (c.contains('pl-4')) style.paddingLeft = '1rem'
     if (c.contains('ml-4')) style.marginLeft = '1rem'
 
-    // A heading already carries an inline font-size from the Formatting
-    // settings, so the `text-*` utility class must not overwrite it.
     if (!style.fontSize) {
       if (c.contains('text-sm')) style.fontSize = '0.875rem'
       if (c.contains('text-base')) style.fontSize = '1rem'
@@ -402,7 +390,6 @@ export async function exportToDocx(
       Math.round(content.width * CSS_PX_PER_INCH)
     )
 
-    // Parse markdown-like content into DOCX paragraphs
     const lines = normalizeAssignmentContent(markdownContent).split('\n')
     const paragraphs: Paragraph[] = []
 
@@ -433,8 +420,6 @@ export async function exportToDocx(
               ? 'svg'
               : 'png'
             if (imageType === 'svg') {
-              // DOCX only supports SVG images with a PNG fallback, which we
-              // cannot produce client-side, so skip embedding this image.
               throw new Error('SVG images are not supported in Word export')
             }
             const imageBuffer = await response.arrayBuffer()
@@ -454,8 +439,6 @@ export async function exportToDocx(
             paragraphs.push(
               bodyParagraph(stripInlineMarkers(imageMatch[1]), formatting, { line: 360, after: 150 })
             )
-            // The image line is fully handled, but the rest of the assignment
-            // must still be exported.
             continue
           } catch (error) {
             console.warn('Could not embed assignment image in Word export:', error)
@@ -481,7 +464,6 @@ export async function exportToDocx(
                 bottom: Math.round(pageMargin.bottom * TWIPS_PER_INCH),
                 left: Math.round(pageMargin.left * TWIPS_PER_INCH),
               },
-              // Border add kar rahe hain DOCX mein
               borders: getDocxBorder(formatting.pageBorder)
             },
           },
@@ -501,14 +483,13 @@ export async function exportToDocx(
 export function convertMarkdownToHtml(markdown: string, formatting: FormattingSettings = defaultFormatting): string {
   let html = normalizeAssignmentContent(markdown)
 
-  // Alignments handling
   const justifyStyle = formatting.justifyAlignment ? 'text-align: justify;' : '';
   const weightStyle = formatting.headingBold ? 'font-weight: bold;' : 'font-weight: normal;';
 
-  // Headers (must be done in order from h6 to h1 to avoid conflicts)
   const headingStyle = `font-family:${formatting.headingFont};font-size:${formatting.headingSize}pt;${weightStyle}${justifyStyle}`
   const bodyStyle = `font-family:${formatting.bodyFont};font-size:${formatting.bodySize}pt;${justifyStyle}`
   const headingClass = 'text-slate-900 dark:text-slate-100'
+  
   html = html.replace(/^###### (.*?)$/gm, `<h6 class="mt-4 mb-2 text-base ${headingClass}" style="${headingStyle}">$1</h6>`)
   html = html.replace(/^##### (.*?)$/gm, `<h5 class="mt-4 mb-2 text-lg ${headingClass}" style="${headingStyle}">$1</h5>`)
   html = html.replace(/^#### (.*?)$/gm, `<h4 class="mt-4 mb-2 text-xl ${headingClass}" style="${headingStyle}">$1</h4>`)
@@ -516,53 +497,40 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
   html = html.replace(/^## (.*?)$/gm, `<h2 class="mt-6 mb-3 text-3xl ${headingClass}" style="${headingStyle}">$1</h2>`)
   html = html.replace(/^# (.*?)$/gm, `<h1 class="mt-8 mb-4 text-4xl ${headingClass}" style="${headingStyle}">$1</h1>`)
 
-  // Code blocks (preserve before other replacements)
   html = html.replace(
     /```([\s\S]*?)```/g,
     '<pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg overflow-x-auto my-4"><code>$1</code></pre>'
   )
 
-  // Inline code
   html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-sm">$1</code>')
-
-  // Bold (both ** and __)
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
   html = html.replace(/__(.*?)__/g, '<strong class="font-bold">$1</strong>')
-
-  // Italic (both * and _)
   html = html.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
   html = html.replace(/_(.*?)_/g, '<em class="italic">$1</em>')
 
-  // Images
   html = html.replace(
     /!\[(.*?)\]\((.*?)\)/g,
     '<figure class="my-4"><img src="$2" alt="$1" class="max-w-full h-auto rounded-lg border border-gray-300 dark:border-gray-600" /><figcaption class="text-sm text-gray-600 dark:text-gray-400 mt-2">$1</figcaption></figure>'
   )
 
-  // Links
   html = html.replace(
     /\[(.*?)\]\((.*?)\)/g,
     '<a href="$2" class="text-blue-600 dark:text-blue-400 underline hover:no-underline" target="_blank" rel="noopener noreferrer">$1</a>'
   )
 
-  // Bullet lists
   html = html.replace(/^\* (.*?)$/gm, '<li class="ml-4">$1</li>')
   html = html.replace(/^- (.*?)$/gm, '<li class="ml-4">$1</li>')
   html = html.replace(/^(\d+)\. (.*?)$/gm, '<li class="ml-4">$2</li>')
 
-  // Wrap list items
   html = html.replace(/(<li.*?<\/li>(?:\n<li.*?<\/li>)*)/g, `<ul class="list-disc my-2" style="${bodyStyle}">$1</ul>`)
 
-  // Blockquotes
   html = html.replace(
     /^&gt; (.*?)$/gm,
     `<blockquote class="border-l-4 border-blue-500 pl-4 py-2 my-2 italic text-gray-600 dark:text-gray-400" style="${bodyStyle}">$1</blockquote>`
   )
 
-  // Horizontal rules
   html = html.replace(/^---$/gm, '<hr class="my-4 border-t-2 border-gray-300 dark:border-gray-600" />')
 
-  // Paragraphs (wrap remaining text)
   const paragraphs = html.split('\n\n')
   const wrappedParagraphs = paragraphs.map((para: string) => {
     para = para.trim()
@@ -586,9 +554,9 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
     return `<p class="my-3 leading-relaxed text-slate-900 dark:text-slate-100" style="${bodyStyle}">${para}</p>`
   })
   
-  // Apply page border styling explicitly to the wrapper if selected
+  // Document Preview UI border styling 
   const borderStyle = formatting.pageBorder !== 'none' 
-    ? `border: ${formatting.pageBorder === 'double' ? '3px double' : formatting.pageBorder === 'dashed' ? '1px dashed' : formatting.pageBorder === 'dotted' ? '1px dotted' : '1px solid'} #000; padding: 1rem;`
+    ? `border: ${formatting.pageBorder === 'double' ? '4px double' : formatting.pageBorder === 'dashed' ? '2px dashed' : formatting.pageBorder === 'dotted' ? '2px dotted' : '2px solid'} #333; padding: 2rem; margin: 1rem 0;`
     : '';
 
   return `<div class="prose dark:prose-invert max-w-none" style="${borderStyle}">${wrappedParagraphs.join('')}</div>`
