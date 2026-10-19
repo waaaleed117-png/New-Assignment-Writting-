@@ -71,7 +71,6 @@ function bodyParagraph(
   })
 }
 
-// Stable DOCX Page Border settings
 function getDocxBorder(borderId: PageBorderId) {
   if (borderId === 'none') return undefined
 
@@ -402,20 +401,38 @@ export async function exportToDocx(
     const paragraphs: Paragraph[] = []
 
     for (const line of lines) {
-      if (line.startsWith('# ')) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('# ')) {
         paragraphs.push(
-          headingParagraph(line.replace('# ', ''), HeadingLevel.HEADING_1, 200, formatting)
+          headingParagraph(trimmed.replace('# ', ''), HeadingLevel.HEADING_1, 200, formatting)
         )
-      } else if (line.startsWith('## ')) {
+      } else if (trimmed.startsWith('## ')) {
         paragraphs.push(
-          headingParagraph(line.replace('## ', ''), HeadingLevel.HEADING_2, 150, formatting)
+          headingParagraph(trimmed.replace('## ', ''), HeadingLevel.HEADING_2, 150, formatting)
         )
-      } else if (line.startsWith('### ')) {
+      } else if (trimmed.startsWith('### ')) {
         paragraphs.push(
-          headingParagraph(line.replace('### ', ''), HeadingLevel.HEADING_3, 100, formatting)
+          headingParagraph(trimmed.replace('### ', ''), HeadingLevel.HEADING_3, 100, formatting)
         )
-      } else if (line.trim()) {
-        const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+      } else if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        const cleanBulletText = trimmed.replace(/^[\*\-]\s+/, '')
+        paragraphs.push(
+          new Paragraph({
+            bullet: { level: 0 },
+            spacing: { line: 360, after: 80 },
+            alignment: formatting.justifyAlignment ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
+            children: [
+              new TextRun({
+                text: stripInlineMarkers(cleanBulletText),
+                font: formatting.bodyFont,
+                size: toHalfPoints(formatting.bodySize),
+                color: DOCX_TEXT_COLOR,
+              }),
+            ],
+          })
+        )
+      } else if (trimmed) {
+        const imageMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
         if (imageMatch) {
           try {
             const response = await fetch(imageMatch[2])
@@ -452,7 +469,7 @@ export async function exportToDocx(
             console.warn('Could not embed assignment image in Word export:', error)
           }
         }
-        paragraphs.push(bodyParagraph(stripInlineMarkers(line), formatting))
+        paragraphs.push(bodyParagraph(stripInlineMarkers(trimmed), formatting))
       }
     }
 
@@ -530,11 +547,11 @@ export function convertMarkdownToHtml(
     '<a href="$2" class="text-blue-600 dark:text-blue-400 underline hover:no-underline" target="_blank" rel="noopener noreferrer">$1</a>'
   )
 
-  html = html.replace(/^\* (.*?)$/gm, '<li class="ml-4">$1</li>')
-  html = html.replace(/^- (.*?)$/gm, '<li class="ml-4">$1</li>')
-  html = html.replace(/^(\d+)\. (.*?)$/gm, '<li class="ml-4">$2</li>')
+  // Clean Bullet Points parsing so literal asterisks are converted to real clean HTML list items
+  html = html.replace(/^\s*[\*\-]\s+(.*?)$/gm, '<li class="ml-2" style="list-style-type: disc;">$1</li>')
+  html = html.replace(/^(\d+)\.\s+(.*?)$/gm, '<li class="ml-2" style="list-style-type: decimal;">$2</li>')
 
-  html = html.replace(/(<li.*?<\/li>(?:\n<li.*?<\/li>)*)/g, `<ul class="list-disc my-2" style="${bodyStyle}">$1</ul>`)
+  html = html.replace(/(<li.*?<\/li>(?:\n<li.*?<\/li>)*)/g, `<ul style="margin-top: 0.5rem; margin-bottom: 0.5rem; padding-left: 1.25rem; ${bodyStyle}">$1</ul>`)
 
   html = html.replace(
     /^&gt; (.*?)$/gm,
