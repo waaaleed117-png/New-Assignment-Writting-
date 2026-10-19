@@ -13,7 +13,7 @@ import {
   HEADING_SIZE_OPTIONS,
   PAGE_MARGIN_OPTIONS,
   PAGE_SIZE_OPTIONS,
-  PAGE_BORDER_OPTIONS, // <-- Yeh naya import add kiya hai
+  PAGE_BORDER_OPTIONS,
 } from '@/lib/formatting'
 
 interface Attachment {
@@ -41,7 +41,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
     const files = Array.from(e.target.files || [])
 
     files.forEach((file) => {
-      // Validate file type and size
       const maxSize = 10 * 1024 * 1024 // 10MB
       const allowedTypes = [
         'image/jpeg',
@@ -62,7 +61,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
         return
       }
 
-      // Create preview for images
       let preview: string | undefined
 
       if (file.type.startsWith('image/')) {
@@ -91,7 +89,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
       toast.success(`${file.name} attached`)
     })
 
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -131,8 +128,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
           data: await readFileAsDataURL(att.file),
         }))
       )
-      // pageLength 0 is forwarded as-is so the server can tell "Select" apart
-      // from a real choice.
       await onSendMessage(input, attachmentPayloads, pageLength, formatting)
       setInput('')
       setAttachments([])
@@ -201,7 +196,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
 
       {/* Input Area */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-        {/* Attach Button */}
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || sending}
@@ -220,7 +214,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
           accept="image/*,.pdf,.doc,.docx"
         />
 
-        {/* Text Input */}
         <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-white/70 bg-white/35 px-3 py-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/10 sm:px-4">
           <textarea
             ref={textareaRef}
@@ -237,7 +230,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
             style={{ maxHeight: '200px', minHeight: '44px' }}
           />
 
-          {/* Send Button */}
           <motion.button
             onClick={handleSend}
             disabled={disabled || sending || (!input.trim() && attachments.length === 0)}
@@ -287,7 +279,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Heading font<select value={formatting.headingFont} onChange={(event) => setFormatting((current) => ({ ...current, headingFont: event.target.value }))} className="input-field mt-2">{FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}</select></label>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Heading size<select value={formatting.headingSize} onChange={(event) => setFormatting((current) => ({ ...current, headingSize: Number(event.target.value) }))} className="input-field mt-2">{HEADING_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} pt</option>)}</select></label>
             
-            {/* Naya Option: Heading Bold */}
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Heading bold
               <select 
@@ -300,7 +291,6 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
               </select>
             </label>
 
-            {/* Naya Option: Justify alignment */}
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Justify alignment
               <select 
@@ -316,19 +306,39 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Page margin<select value={formatting.pageMargin} onChange={(event) => setFormatting((current) => ({ ...current, pageMargin: event.target.value as FormattingSettings['pageMargin'] }))} className="input-field mt-2">{PAGE_MARGIN_OPTIONS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Page size<select value={formatting.pageSize} onChange={(event) => setFormatting((current) => ({ ...current, pageSize: event.target.value as FormattingSettings['pageSize'] }))} className="input-field mt-2">{PAGE_SIZE_OPTIONS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
             
-            {/* Naya Option: Page Border */}
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:col-span-2">
-              Page border
-              <select 
-                value={formatting.pageBorder} 
-                onChange={(event) => setFormatting((current) => ({ ...current, pageBorder: event.target.value as FormattingSettings['pageBorder'] }))} 
-                className="input-field mt-2"
-              >
-                {PAGE_BORDER_OPTIONS.map((preset) => (
-                  <option key={preset.id} value={preset.id}>{preset.label}</option>
-                ))}
-              </select>
-            </label>
+            {/* Visual Border Dropdown (Naya Design!) */}
+            <div className="sm:col-span-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Page border style</label>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {PAGE_BORDER_OPTIONS.map((preset) => {
+                  const isSelected = formatting.pageBorder === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setFormatting((current) => ({ ...current, pageBorder: preset.id as FormattingSettings['pageBorder'] }))}
+                      className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-2 transition-all ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-500/10 shadow-sm'
+                          : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {/* Box for Visual Border Preview */}
+                      <div className="flex h-10 w-full items-center justify-center rounded bg-slate-100 dark:bg-slate-900 overflow-hidden px-2">
+                        {preset.id === 'none' && <span className="text-[10px] text-slate-400 font-medium">None</span>}
+                        {preset.id === 'solid' && <div className="w-full border-t-2 border-slate-700 dark:border-slate-300" />}
+                        {preset.id === 'dashed' && <div className="w-full border-t-2 border-dashed border-slate-700 dark:border-slate-300" />}
+                        {preset.id === 'dotted' && <div className="w-full border-t-[3px] border-dotted border-slate-700 dark:border-slate-300" />}
+                        {preset.id === 'double' && <div className="w-full border-t-4 border-double border-slate-700 dark:border-slate-300" />}
+                      </div>
+                      <span className={`text-[10px] font-semibold tracking-wide ${isSelected ? 'text-indigo-600 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                        {preset.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
           </div>
           <button type="button" onClick={() => setFormattingOpen(false)} className="btn-primary mt-6 w-full">Apply formatting</button>
