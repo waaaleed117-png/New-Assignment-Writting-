@@ -19,8 +19,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Smart fix: Chat bubble ke andar page border hide karne ke liye (taake UI kharab na ho)
-  // Border sirf Preview aur Export file mein show hoga.
   const chatFormatting = { ...formatting, pageBorder: 'none' as const }
 
   const handleCopy = async () => {
@@ -33,8 +31,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleDownloadPDF = async () => {
     try {
       const { exportToPDF } = await import('@/lib/export')
-      // PDF ke liye original formatting (jisme border shamil hai) use hogi
-      const htmlContent = convertMarkdownToHtml(message.content, formatting)
+      // PDF export mein false pass karna zaroori hai taake HTML ka double border na aaye
+      const htmlContent = convertMarkdownToHtml(message.content, formatting, false)
       await exportToPDF(htmlContent, 'assignment.pdf', formatting)
       toast.success('PDF downloaded successfully')
     } catch (error) {
@@ -46,7 +44,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleDownloadDocx = async () => {
     try {
       const { exportToDocx } = await import('@/lib/export')
-      // Word document ke liye bhi original formatting jayegi
       await exportToDocx(message.content, 'assignment.docx', formatting)
       toast.success('Word document downloaded successfully')
     } catch (error) {
@@ -63,14 +60,12 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Avatar */}
       {!isUser && (
         <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-xs font-bold text-white shadow-lg shadow-indigo-500/20">
           ✦
         </div>
       )}
 
-      {/* Message Container */}
       <div
           className={`min-w-0 rounded-2xl p-4 shadow-sm sm:p-5 ${
           isUser
@@ -78,7 +73,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
             : 'w-full glass-surface text-slate-900 dark:text-slate-100'
         }`}
       >
-        {/* Message Content */}
         <div className="prose dark:prose-invert prose-sm max-w-none">
           {isUser ? (
             <div className="flex flex-col gap-2">
@@ -97,15 +91,13 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
           ) : (
             <div
               dangerouslySetInnerHTML={{
-                // Yahan chatFormatting use ki hai taake chat mein border na aaye
-                __html: convertMarkdownToHtml(message.content, chatFormatting),
+                __html: convertMarkdownToHtml(message.content, chatFormatting, false),
               }}
                 className="prose-content dark:prose-invert"
             />
           )}
         </div>
 
-        {/* Attachments Preview */}
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {message.attachments.map((attachment, idx) => (
@@ -119,7 +111,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
           </div>
         )}
 
-        {/* Action Buttons - Only for Assistant Messages */}
         {!isUser && (
             <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-white/10">
             <button
@@ -165,9 +156,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
             <button type="button" onClick={() => setShowPreview(false)} className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition hover:bg-white/10" aria-label="Close preview"><X size={18} /></button>
           </div>
           <div className="overflow-y-auto p-4 sm:p-6">
-            {/* Preview ke andar original formatting use hogi taake border dikhay */}
             <article className="preview-paper prose prose-sm mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-lg sm:p-10 sm:rounded-3xl"
-              dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content, formatting) }}
+              dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content, formatting, true) }}
             />
           </div>
           <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 p-4">
