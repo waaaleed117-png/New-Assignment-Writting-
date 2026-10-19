@@ -13,6 +13,7 @@ import {
   HEADING_SIZE_OPTIONS,
   PAGE_MARGIN_OPTIONS,
   PAGE_SIZE_OPTIONS,
+  PAGE_BORDER_OPTIONS, // <-- Yeh naya import add kiya hai
 } from '@/lib/formatting'
 
 interface Attachment {
@@ -282,10 +283,53 @@ export default function ChatInput({ onSendMessage, disabled = false }: ChatInput
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Body font<select value={formatting.bodyFont} onChange={(event) => setFormatting((current) => ({ ...current, bodyFont: event.target.value }))} className="input-field mt-2">{FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}</select></label>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Body size<select value={formatting.bodySize} onChange={(event) => setFormatting((current) => ({ ...current, bodySize: Number(event.target.value) }))} className="input-field mt-2">{BODY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} pt</option>)}</select></label>
+            
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Heading font<select value={formatting.headingFont} onChange={(event) => setFormatting((current) => ({ ...current, headingFont: event.target.value }))} className="input-field mt-2">{FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}</select></label>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Heading size<select value={formatting.headingSize} onChange={(event) => setFormatting((current) => ({ ...current, headingSize: Number(event.target.value) }))} className="input-field mt-2">{HEADING_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} pt</option>)}</select></label>
+            
+            {/* Naya Option: Heading Bold */}
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Heading bold
+              <select 
+                value={formatting.headingBold ? 'yes' : 'no'} 
+                onChange={(event) => setFormatting((current) => ({ ...current, headingBold: event.target.value === 'yes' }))} 
+                className="input-field mt-2"
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+
+            {/* Naya Option: Justify alignment */}
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Justify alignment
+              <select 
+                value={formatting.justifyAlignment ? 'yes' : 'no'} 
+                onChange={(event) => setFormatting((current) => ({ ...current, justifyAlignment: event.target.value === 'yes' }))} 
+                className="input-field mt-2"
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Page margin<select value={formatting.pageMargin} onChange={(event) => setFormatting((current) => ({ ...current, pageMargin: event.target.value as FormattingSettings['pageMargin'] }))} className="input-field mt-2">{PAGE_MARGIN_OPTIONS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Page size<select value={formatting.pageSize} onChange={(event) => setFormatting((current) => ({ ...current, pageSize: event.target.value as FormattingSettings['pageSize'] }))} className="input-field mt-2">{PAGE_SIZE_OPTIONS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
+            
+            {/* Naya Option: Page Border */}
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 sm:col-span-2">
+              Page border
+              <select 
+                value={formatting.pageBorder} 
+                onChange={(event) => setFormatting((current) => ({ ...current, pageBorder: event.target.value as FormattingSettings['pageBorder'] }))} 
+                className="input-field mt-2"
+              >
+                {PAGE_BORDER_OPTIONS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>{preset.label}</option>
+                ))}
+              </select>
+            </label>
+
           </div>
           <button type="button" onClick={() => setFormattingOpen(false)} className="btn-primary mt-6 w-full">Apply formatting</button>
         </div>
