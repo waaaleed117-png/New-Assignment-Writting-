@@ -1,8 +1,8 @@
-import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun } from 'docx'
+import { Document, ImageRun, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import type { FormattingSettings } from '@/lib/types'
+import type { FormattingSettings, PageBorderId } from '@/lib/types'
 import {
   defaultFormatting,
   getContentBox,
@@ -36,6 +36,7 @@ function headingParagraph(
 ): Paragraph {
   return new Paragraph({
     heading,
+    alignment: formatting.justifyAlignment ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
     spacing: { after: spacingAfter },
     children: [
       new TextRun({
@@ -43,9 +44,8 @@ function headingParagraph(
         font: formatting.headingFont,
         size: toHalfPoints(formatting.headingSize),
         color: DOCX_TEXT_COLOR,
-        // Only the selected font and size are applied, so bold is turned off
-        // explicitly rather than left to inherit from a style.
-        bold: false,
+        // Bold apply karna agar setting true ho, warna false
+        bold: formatting.headingBold,
       }),
     ],
   })
@@ -58,6 +58,7 @@ function bodyParagraph(
 ): Paragraph {
   return new Paragraph({
     spacing,
+    alignment: formatting.justifyAlignment ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
     children: [
       new TextRun({
         text,
@@ -69,21 +70,33 @@ function bodyParagraph(
   })
 }
 
-/**
- * The `docx` package ships Word's own built-in heading styles, which are blue
- * (Heading1/2 = 2E74B5, Heading3 = 1F4D78) and carry their own font sizes.
- * `styles.default` overrides those definitions in place — unlike
- * `styles.paragraphStyles`, which merely appends and would leave two
- * `<w:style>` elements sharing a `w:styleId`, which is invalid OOXML.
- * `document.run` also stops Word falling back to 10pt Calibri for any run
- * without an explicit size.
- */
+/** DOCX border map */
+function getDocxBorder(borderId: PageBorderId) {
+  if (borderId === 'none') return undefined;
+
+  const mapping: Record<string, typeof BorderStyle[keyof typeof BorderStyle]> = {
+    solid: BorderStyle.SINGLE,
+    dashed: BorderStyle.DASH_DOT_STROKED, // Or DASHED based on preference
+    dotted: BorderStyle.DOTTED,
+    double: BorderStyle.DOUBLE,
+  }
+
+  const borderStyle = mapping[borderId] || BorderStyle.SINGLE;
+
+  return {
+    top: { style: borderStyle, size: 24, color: '000000', space: 24 },
+    bottom: { style: borderStyle, size: 24, color: '000000', space: 24 },
+    left: { style: borderStyle, size: 24, color: '000000', space: 24 },
+    right: { style: borderStyle, size: 24, color: '000000', space: 24 },
+  }
+}
+
 function buildDocxStyles(formatting: FormattingSettings) {
   const headingRun = {
     color: DOCX_TEXT_COLOR,
     font: formatting.headingFont,
     size: toHalfPoints(formatting.headingSize),
-    bold: false,
+    bold: formatting.headingBold,
   }
   const blackRun = { color: DOCX_TEXT_COLOR }
 
@@ -138,6 +151,7 @@ export async function exportToPDF(
     'background: #ffffff',
     `font-family: ${formatting.bodyFont}, sans-serif`,
     'line-height: 1.6',
+    formatting.justifyAlignment ? 'text-align: justify;' : 'text-align: left;'
   ].join('; ')
   document.body.appendChild(container)
 
@@ -218,6 +232,40 @@ export async function exportToPDF(
         undefined,
         'FAST'
       )
+      
+      // PDF Border drawing logic if selected
+      if (formatting.pageBorder !== 'none') {
+        const borderPadding = 0.2; // Inches
+        const rectX = pageMargin.left - borderPadding;
+        const rectY = pageMargin.top - borderPadding;
+        const rectW = content.width + (borderPadding * 2);
+        const rectH = pageSize.height - (pageMargin.top + pageMargin.bottom) + (borderPadding * 2);
+        
+        doc.setDrawColor(0); // Black
+        doc.setLineWidth(0.02);
+        
+        if (formatting.pageBorder === 'solid') {
+           doc.rect(rectX, rectY, rectW, rectH);
+        } else if (formatting.pageBorder === 'double') {
+           doc.rect(rectX, rectY, rectW, rectH);
+           doc.rect(rectX + 0.05, rectY + 0.05, rectW - 0.1, rectH - 0.1);
+        }
+        else {
+           // For dashed and dotted jsPDF does not have a built in 'dash' that works easily across all versions via simple string. 
+           // Advanced dash logic is required for jsPDF, but as a fallback for now we draw solid, or if supported, we can use setLineDash.
+           if (typeof doc.setLineDash === 'function') {
+               if (formatting.pageBorder === 'dashed') {
+                   doc.setLineDash([0.1, 0.1], 0);
+               } else if (formatting.pageBorder === 'dotted') {
+                   doc.setLineDash([0.02, 0.05], 0);
+               }
+           }
+           doc.rect(rectX, rectY, rectW, rectH);
+           if (typeof doc.setLineDash === 'function') {
+               doc.setLineDash([], 0); // reset
+           }
+        }
+      }
     }
 
     doc.save(filename)
@@ -400,6 +448,7 @@ export async function exportToDocx(
                   }),
                 ],
                 spacing: { after: 100 },
+                alignment: formatting.justifyAlignment ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
               })
             )
             paragraphs.push(
@@ -432,6 +481,8 @@ export async function exportToDocx(
                 bottom: Math.round(pageMargin.bottom * TWIPS_PER_INCH),
                 left: Math.round(pageMargin.left * TWIPS_PER_INCH),
               },
+              // Border add kar rahe hain DOCX mein
+              borders: getDocxBorder(formatting.pageBorder)
             },
           },
           children: paragraphs,
@@ -450,12 +501,13 @@ export async function exportToDocx(
 export function convertMarkdownToHtml(markdown: string, formatting: FormattingSettings = defaultFormatting): string {
   let html = normalizeAssignmentContent(markdown)
 
+  // Alignments handling
+  const justifyStyle = formatting.justifyAlignment ? 'text-align: justify;' : '';
+  const weightStyle = formatting.headingBold ? 'font-weight: bold;' : 'font-weight: normal;';
+
   // Headers (must be done in order from h6 to h1 to avoid conflicts)
-  // `font-weight:normal` is required because browsers render h1-h6 bold by
-  // default, which would add weight the user never asked for.
-  const headingStyle = `font-family:${formatting.headingFont};font-size:${formatting.headingSize}pt;font-weight:normal`
-  const bodyStyle = `font-family:${formatting.bodyFont};font-size:${formatting.bodySize}pt`
-  // Headings carry only the selected font and size, so no weight class is added.
+  const headingStyle = `font-family:${formatting.headingFont};font-size:${formatting.headingSize}pt;${weightStyle}${justifyStyle}`
+  const bodyStyle = `font-family:${formatting.bodyFont};font-size:${formatting.bodySize}pt;${justifyStyle}`
   const headingClass = 'text-slate-900 dark:text-slate-100'
   html = html.replace(/^###### (.*?)$/gm, `<h6 class="mt-4 mb-2 text-base ${headingClass}" style="${headingStyle}">$1</h6>`)
   html = html.replace(/^##### (.*?)$/gm, `<h5 class="mt-4 mb-2 text-lg ${headingClass}" style="${headingStyle}">$1</h5>`)
@@ -499,12 +551,12 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
   html = html.replace(/^(\d+)\. (.*?)$/gm, '<li class="ml-4">$2</li>')
 
   // Wrap list items
-  html = html.replace(/(<li.*?<\/li>(?:\n<li.*?<\/li>)*)/g, '<ul class="list-disc my-2">$1</ul>')
+  html = html.replace(/(<li.*?<\/li>(?:\n<li.*?<\/li>)*)/g, `<ul class="list-disc my-2" style="${bodyStyle}">$1</ul>`)
 
   // Blockquotes
   html = html.replace(
     /^&gt; (.*?)$/gm,
-    '<blockquote class="border-l-4 border-blue-500 pl-4 py-2 my-2 italic text-gray-600 dark:text-gray-400">$1</blockquote>'
+    `<blockquote class="border-l-4 border-blue-500 pl-4 py-2 my-2 italic text-gray-600 dark:text-gray-400" style="${bodyStyle}">$1</blockquote>`
   )
 
   // Horizontal rules
@@ -533,6 +585,11 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
     }
     return `<p class="my-3 leading-relaxed text-slate-900 dark:text-slate-100" style="${bodyStyle}">${para}</p>`
   })
+  
+  // Apply page border styling explicitly to the wrapper if selected
+  const borderStyle = formatting.pageBorder !== 'none' 
+    ? `border: ${formatting.pageBorder === 'double' ? '3px double' : formatting.pageBorder === 'dashed' ? '1px dashed' : formatting.pageBorder === 'dotted' ? '1px dotted' : '1px solid'} #000; padding: 1rem;`
+    : '';
 
-  return `<div class="prose dark:prose-invert max-w-none">${wrappedParagraphs.join('')}</div>`
+  return `<div class="prose dark:prose-invert max-w-none" style="${borderStyle}">${wrappedParagraphs.join('')}</div>`
 }
