@@ -1,16 +1,13 @@
-import { 
-  Document, 
-  ImageRun, 
-  Packer, 
-  Paragraph, 
-  HeadingLevel, 
-  TextRun, 
-  AlignmentType, 
-  BorderStyle, 
+import {
+  Document,
+  ImageRun,
+  Packer,
+  Paragraph,
+  HeadingLevel,
+  TextRun,
+  AlignmentType,
+  BorderStyle,
   PageBorderOffsetFrom,
-  PageBorderDisplay,
-  PageBorderZOrder,
-  ViewType
 } from 'docx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
@@ -74,25 +71,23 @@ function bodyParagraph(
   })
 }
 
-// Fixed DOCX Page Border configuration for MS Word
+// Stable DOCX Page Border settings
 function getDocxBorder(borderId: PageBorderId) {
-  if (borderId === 'none') return undefined;
+  if (borderId === 'none') return undefined
 
   const mapping: Record<string, typeof BorderStyle[keyof typeof BorderStyle]> = {
     solid: BorderStyle.SINGLE,
-    dashed: BorderStyle.DASHED, 
+    dashed: BorderStyle.DASHED,
     dotted: BorderStyle.DOTTED,
     double: BorderStyle.DOUBLE,
   }
 
-  const borderStyle = mapping[borderId] || BorderStyle.SINGLE;
-  const bConfig = { style: borderStyle, size: 12, color: '000000', space: 24 };
+  const borderStyle = mapping[borderId] || BorderStyle.SINGLE
+  const bConfig = { style: borderStyle, size: 12, color: '000000', space: 24 }
 
   return {
     pageBorders: {
       offsetFrom: PageBorderOffsetFrom.PAGE,
-      display: PageBorderDisplay.ALL_PAGES,
-      zOrder: PageBorderZOrder.FRONT,
     },
     pageBorderTop: bConfig,
     pageBorderBottom: bConfig,
@@ -159,7 +154,7 @@ export async function exportToPDF(
     'background: #ffffff',
     `font-family: ${formatting.bodyFont}, sans-serif`,
     'line-height: 1.6',
-    formatting.justifyAlignment ? 'text-align: justify;' : 'text-align: left;'
+    formatting.justifyAlignment ? 'text-align: justify;' : 'text-align: left;',
   ].join('; ')
   document.body.appendChild(container)
 
@@ -238,35 +233,35 @@ export async function exportToPDF(
         undefined,
         'FAST'
       )
-      
-      if (formatting.pageBorder !== 'none') {
-        const marginFromEdge = 0.33; 
-        const rectX = marginFromEdge;
-        const rectY = marginFromEdge;
-        const rectW = pageSize.width - (marginFromEdge * 2);
-        const rectH = pageSize.height - (marginFromEdge * 2);
-        
-        doc.setDrawColor(0); 
-        doc.setLineWidth(0.015);
-        
+
+      if (formatting.pageBorder && formatting.pageBorder !== 'none') {
+        const marginFromEdge = 0.33
+        const rectX = marginFromEdge
+        const rectY = marginFromEdge
+        const rectW = pageSize.width - marginFromEdge * 2
+        const rectH = pageSize.height - marginFromEdge * 2
+
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.015)
+
         if (formatting.pageBorder === 'solid') {
-           doc.rect(rectX, rectY, rectW, rectH);
+          doc.rect(rectX, rectY, rectW, rectH)
         } else if (formatting.pageBorder === 'double') {
-           doc.rect(rectX, rectY, rectW, rectH);
-           doc.rect(rectX + 0.04, rectY + 0.04, rectW - 0.08, rectH - 0.08);
-        }
-        else {
-           if (typeof doc.setLineDash === 'function') {
-               if (formatting.pageBorder === 'dashed') {
-                   doc.setLineDash([0.1, 0.1], 0);
-               } else if (formatting.pageBorder === 'dotted') {
-                   doc.setLineDash([0.03, 0.05], 0);
-               }
-           }
-           doc.rect(rectX, rectY, rectW, rectH);
-           if (typeof doc.setLineDash === 'function') {
-               doc.setLineDash([], 0);
-           }
+          doc.rect(rectX, rectY, rectW, rectH)
+          doc.rect(rectX + 0.04, rectY + 0.04, rectW - 0.08, rectH - 0.08)
+        } else {
+          const docAny = doc as any
+          if (typeof docAny.setLineDash === 'function') {
+            if (formatting.pageBorder === 'dashed') {
+              docAny.setLineDash([0.1, 0.1], 0)
+            } else if (formatting.pageBorder === 'dotted') {
+              docAny.setLineDash([0.03, 0.05], 0)
+            }
+          }
+          doc.rect(rectX, rectY, rectW, rectH)
+          if (typeof docAny.setLineDash === 'function') {
+            docAny.setLineDash([], 0)
+          }
         }
       }
     }
@@ -462,11 +457,6 @@ export async function exportToDocx(
     }
 
     const doc = new Document({
-      views: [
-        {
-          type: ViewType.PRINT,
-        },
-      ],
       styles: buildDocxStyles(formatting),
       sections: [
         {
@@ -482,7 +472,7 @@ export async function exportToDocx(
                 bottom: Math.round(pageMargin.bottom * TWIPS_PER_INCH),
                 left: Math.round(pageMargin.left * TWIPS_PER_INCH),
               },
-              borders: getDocxBorder(formatting.pageBorder)
+              borders: getDocxBorder(formatting.pageBorder),
             },
           },
           children: paragraphs,
@@ -498,16 +488,20 @@ export async function exportToDocx(
   }
 }
 
-export function convertMarkdownToHtml(markdown: string, formatting: FormattingSettings = defaultFormatting, isWebPreview: boolean = false): string {
+export function convertMarkdownToHtml(
+  markdown: string,
+  formatting: FormattingSettings = defaultFormatting,
+  isWebPreview: boolean = false
+): string {
   let html = normalizeAssignmentContent(markdown)
 
-  const justifyStyle = formatting.justifyAlignment ? 'text-align: justify;' : '';
-  const weightStyle = formatting.headingBold ? 'font-weight: bold;' : 'font-weight: normal;';
+  const justifyStyle = formatting.justifyAlignment ? 'text-align: justify;' : ''
+  const weightStyle = formatting.headingBold ? 'font-weight: bold;' : 'font-weight: normal;'
 
   const headingStyle = `font-family:${formatting.headingFont};font-size:${formatting.headingSize}pt;${weightStyle}${justifyStyle}`
   const bodyStyle = `font-family:${formatting.bodyFont};font-size:${formatting.bodySize}pt;${justifyStyle}`
   const headingClass = 'text-slate-900 dark:text-slate-100'
-  
+
   html = html.replace(/^###### (.*?)$/gm, `<h6 class="mt-4 mb-2 text-base ${headingClass}" style="${headingStyle}">$1</h6>`)
   html = html.replace(/^##### (.*?)$/gm, `<h5 class="mt-4 mb-2 text-lg ${headingClass}" style="${headingStyle}">$1</h5>`)
   html = html.replace(/^#### (.*?)$/gm, `<h4 class="mt-4 mb-2 text-xl ${headingClass}" style="${headingStyle}">$1</h4>`)
@@ -571,10 +565,19 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
     }
     return `<p class="my-3 leading-relaxed text-slate-900 dark:text-slate-100" style="${bodyStyle}">${para}</p>`
   })
-  
-  const borderStyle = (isWebPreview && formatting.pageBorder !== 'none')
-    ? `border: ${formatting.pageBorder === 'double' ? '4px double' : formatting.pageBorder === 'dashed' ? '2px dashed' : formatting.pageBorder === 'dotted' ? '2px dotted' : '2px solid'} #333; padding: 2rem; margin: 1rem 0;`
-    : '';
+
+  const borderStyle =
+    isWebPreview && formatting.pageBorder !== 'none'
+      ? `border: ${
+          formatting.pageBorder === 'double'
+            ? '4px double'
+            : formatting.pageBorder === 'dashed'
+            ? '2px dashed'
+            : formatting.pageBorder === 'dotted'
+            ? '2px dotted'
+            : '2px solid'
+        } #333; padding: 2rem; margin: 1rem 0;`
+      : ''
 
   return `<div class="prose dark:prose-invert max-w-none" style="${borderStyle}">${wrappedParagraphs.join('')}</div>`
 }
