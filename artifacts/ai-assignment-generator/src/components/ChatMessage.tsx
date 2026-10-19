@@ -19,10 +19,13 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Smart fix: Chat bubble ke andar page border hide karne ke liye (taake UI kharab na ho)
+  // Border sirf Preview aur Export file mein show hoga.
+  const chatFormatting = { ...formatting, pageBorder: 'none' as const }
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content)
     setCopied(true)
-    // Notification text change kiya hai user aur AI ke hisaab se
     toast.success(isUser ? 'Message copied' : 'Assignment copied')
     window.setTimeout(() => setCopied(false), 1500)
   }
@@ -30,6 +33,7 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleDownloadPDF = async () => {
     try {
       const { exportToPDF } = await import('@/lib/export')
+      // PDF ke liye original formatting (jisme border shamil hai) use hogi
       const htmlContent = convertMarkdownToHtml(message.content, formatting)
       await exportToPDF(htmlContent, 'assignment.pdf', formatting)
       toast.success('PDF downloaded successfully')
@@ -42,6 +46,7 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleDownloadDocx = async () => {
     try {
       const { exportToDocx } = await import('@/lib/export')
+      // Word document ke liye bhi original formatting jayegi
       await exportToDocx(message.content, 'assignment.docx', formatting)
       toast.success('Word document downloaded successfully')
     } catch (error) {
@@ -53,7 +58,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   return (
     <>
     <motion.div
-      // Yahan mb-6 add kiya hai taake messages aapas mein na jurein
       className={`flex gap-2 sm:gap-4 mb-6 ${isUser ? 'justify-end' : 'items-start justify-start'}`}
       initial={{ opacity: 0, x: isUser ? 20 : -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -77,7 +81,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
         {/* Message Content */}
         <div className="prose dark:prose-invert prose-sm max-w-none">
           {isUser ? (
-            // User ke message ke andar ab copy button add kar diya gaya hai
             <div className="flex flex-col gap-2">
               <p className="whitespace-pre-wrap">{message.content}</p>
               <div className="flex justify-end border-t border-white/20 pt-2 mt-1">
@@ -94,7 +97,8 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
           ) : (
             <div
               dangerouslySetInnerHTML={{
-                __html: convertMarkdownToHtml(message.content, formatting),
+                // Yahan chatFormatting use ki hai taake chat mein border na aaye
+                __html: convertMarkdownToHtml(message.content, chatFormatting),
               }}
                 className="prose-content dark:prose-invert"
             />
@@ -149,6 +153,7 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
         )}
       </div>
     </motion.div>
+    
     {showPreview && !isUser && createPortal(
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowPreview(false)}>
         <div role="dialog" aria-modal="true" aria-labelledby="preview-title" className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-slate-900/90 shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -160,6 +165,7 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
             <button type="button" onClick={() => setShowPreview(false)} className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition hover:bg-white/10" aria-label="Close preview"><X size={18} /></button>
           </div>
           <div className="overflow-y-auto p-4 sm:p-6">
+            {/* Preview ke andar original formatting use hogi taake border dikhay */}
             <article className="preview-paper prose prose-sm mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-lg sm:p-10 sm:rounded-3xl"
               dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content, formatting) }}
             />
