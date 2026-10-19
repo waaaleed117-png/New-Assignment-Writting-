@@ -61,7 +61,7 @@ function bodyParagraph(
   })
 }
 
-// DOCX Border fixing - Properly structure the page borders properties
+// DOCX Border fixing - Moved to TEXT offset to force display in mobile apps
 function getDocxBorder(borderId: PageBorderId) {
   if (borderId === 'none') return undefined;
 
@@ -73,12 +73,11 @@ function getDocxBorder(borderId: PageBorderId) {
   }
 
   const borderStyle = mapping[borderId] || BorderStyle.SINGLE;
-  // Size 12 means 1.5pt in Word. Same look as standard assignment borders.
   const bConfig = { style: borderStyle, size: 12, color: '000000', space: 24 };
 
   return {
     pageBorders: {
-      offsetFrom: PageBorderOffsetFrom.PAGE,
+      offsetFrom: PageBorderOffsetFrom.TEXT, // Text se offset taake mobile hide na kare
     },
     top: bConfig,
     bottom: bConfig,
@@ -225,7 +224,7 @@ export async function exportToPDF(
         'FAST'
       )
       
-      // PDF Border logic - Moved to the outer edge of the page (0.33 inches from edges)
+      // Clean PDF Border (No interference from HTML padding)
       if (formatting.pageBorder !== 'none') {
         const marginFromEdge = 0.33; 
         const rectX = marginFromEdge;
@@ -264,223 +263,8 @@ export async function exportToPDF(
   }
 }
 
-export function normalizeInlineStyles(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>('*').forEach((node) => {
-    const style = node.style
-    const c = node.classList
-
-    if (c.contains('font-bold')) style.fontWeight = 'bold'
-    if (c.contains('italic')) style.fontStyle = 'italic'
-    if (c.contains('underline')) style.textDecoration = 'underline'
-
-    if (
-      c.contains('text-slate-900') ||
-      c.contains('text-slate-100') ||
-      c.contains('dark:text-slate-100')
-    ) {
-      style.color = '#111827'
-    }
-    if (
-      c.contains('text-slate-500') ||
-      c.contains('text-slate-600') ||
-      c.contains('text-gray-600') ||
-      c.contains('dark:text-gray-400') ||
-      c.contains('dark:text-slate-400')
-    ) {
-      style.color = '#4b5563'
-    }
-    if (c.contains('text-blue-600') || c.contains('dark:text-blue-400')) {
-      style.color = '#1d4ed8'
-    }
-    if (
-      c.contains('bg-gray-100') ||
-      c.contains('dark:bg-gray-700') ||
-      c.contains('dark:bg-white/10')
-    ) {
-      style.backgroundColor = '#f1f5f9'
-    }
-
-    if (c.contains('border-gray-300') || c.contains('dark:border-gray-600')) {
-      style.border = '1px solid #d1d5db'
-    }
-    if (c.contains('border-blue-500') || c.contains('dark:border-blue-500')) {
-      style.borderLeft = '4px solid #3b82f6'
-    }
-
-    if (c.contains('rounded-lg')) style.borderRadius = '8px'
-    if (c.contains('rounded')) style.borderRadius = '6px'
-    if (c.contains('list-disc')) style.listStyleType = 'disc'
-    if (c.contains('leading-relaxed')) style.lineHeight = '1.625'
-    if (c.contains('max-w-full')) style.maxWidth = '100%'
-    if (c.contains('max-w-none')) style.maxWidth = 'none'
-    if (c.contains('h-auto')) style.height = 'auto'
-    if (c.contains('whitespace-pre-wrap')) style.whiteSpace = 'pre-wrap'
-    if (c.contains('overflow-x-auto')) style.overflowX = 'auto'
-    if (c.contains('p-4')) style.padding = '1rem'
-    if (c.contains('px-2')) {
-      style.paddingLeft = '0.5rem'
-      style.paddingRight = '0.5rem'
-    }
-    if (c.contains('py-1')) {
-      style.paddingTop = '0.25rem'
-      style.paddingBottom = '0.25rem'
-    }
-    if (c.contains('pl-4')) style.paddingLeft = '1rem'
-    if (c.contains('ml-4')) style.marginLeft = '1rem'
-
-    if (!style.fontSize) {
-      if (c.contains('text-sm')) style.fontSize = '0.875rem'
-      if (c.contains('text-base')) style.fontSize = '1rem'
-      if (c.contains('text-lg')) style.fontSize = '1.125rem'
-      if (c.contains('text-xl')) style.fontSize = '1.25rem'
-      if (c.contains('text-2xl')) style.fontSize = '1.5rem'
-      if (c.contains('text-3xl')) style.fontSize = '1.875rem'
-      if (c.contains('text-4xl')) style.fontSize = '2.25rem'
-    }
-
-    const verticalMargin = c.contains('my-2')
-      ? '0.5rem'
-      : c.contains('my-3')
-      ? '0.75rem'
-      : c.contains('my-4')
-      ? '1rem'
-      : null
-    if (verticalMargin) {
-      style.marginTop = verticalMargin
-      style.marginBottom = verticalMargin
-    }
-    const marginTop = c.contains('mt-2')
-      ? '0.5rem'
-      : c.contains('mt-4')
-      ? '1rem'
-      : c.contains('mt-6')
-      ? '1.5rem'
-      : c.contains('mt-8')
-      ? '2rem'
-      : null
-    if (marginTop) style.marginTop = marginTop
-    const marginBottom = c.contains('mb-2')
-      ? '0.5rem'
-      : c.contains('mb-3')
-      ? '0.75rem'
-      : c.contains('mb-4')
-      ? '1rem'
-      : c.contains('mb-8')
-      ? '2rem'
-      : null
-    if (marginBottom) style.marginBottom = marginBottom
-
-    if (c.length > 0) node.removeAttribute('class')
-  })
-
-  if (!root.style.color) root.style.color = '#111827'
-}
-
-export async function exportToDocx(
-  markdownContent: string,
-  filename: string = 'assignment.docx',
-  formatting: FormattingSettings = defaultFormatting
-) {
-  try {
-    const pageSize = getPageSize(formatting.pageSize)
-    const pageMargin = getPageMargin(formatting.pageMargin)
-    const content = getContentBox(pageSize, pageMargin)
-    const maxImageWidth = Math.min(
-      DOCX_IMAGE_MAX_WIDTH_PX,
-      Math.round(content.width * CSS_PX_PER_INCH)
-    )
-
-    const lines = normalizeAssignmentContent(markdownContent).split('\n')
-    const paragraphs: Paragraph[] = []
-
-    for (const line of lines) {
-      if (line.startsWith('# ')) {
-        paragraphs.push(
-          headingParagraph(line.replace('# ', ''), HeadingLevel.HEADING_1, 200, formatting)
-        )
-      } else if (line.startsWith('## ')) {
-        paragraphs.push(
-          headingParagraph(line.replace('## ', ''), HeadingLevel.HEADING_2, 150, formatting)
-        )
-      } else if (line.startsWith('### ')) {
-        paragraphs.push(
-          headingParagraph(line.replace('### ', ''), HeadingLevel.HEADING_3, 100, formatting)
-        )
-      } else if (line.trim()) {
-        const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
-        if (imageMatch) {
-          try {
-            const response = await fetch(imageMatch[2])
-            const contentType = response.headers.get('content-type') || ''
-            const imageType = contentType.includes('png')
-              ? 'png'
-              : contentType.includes('jpeg') || contentType.includes('jpg')
-              ? 'jpg'
-              : contentType.includes('svg')
-              ? 'svg'
-              : 'png'
-            if (imageType === 'svg') {
-              throw new Error('SVG images are not supported in Word export')
-            }
-            const imageBuffer = await response.arrayBuffer()
-            paragraphs.push(
-              new Paragraph({
-                children: [
-                  new ImageRun({
-                    type: imageType,
-                    data: imageBuffer,
-                    transformation: { width: maxImageWidth, height: Math.round((maxImageWidth * 315) / 560) },
-                  }),
-                ],
-                spacing: { after: 100 },
-                alignment: formatting.justifyAlignment ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
-              })
-            )
-            paragraphs.push(
-              bodyParagraph(stripInlineMarkers(imageMatch[1]), formatting, { line: 360, after: 150 })
-            )
-            continue
-          } catch (error) {
-            console.warn('Could not embed assignment image in Word export:', error)
-          }
-        }
-        paragraphs.push(bodyParagraph(stripInlineMarkers(line), formatting))
-      }
-    }
-
-    const doc = new Document({
-      styles: buildDocxStyles(formatting),
-      sections: [
-        {
-          properties: {
-            page: {
-              size: {
-                width: Math.round(pageSize.width * TWIPS_PER_INCH),
-                height: Math.round(pageSize.height * TWIPS_PER_INCH),
-              },
-              margin: {
-                top: Math.round(pageMargin.top * TWIPS_PER_INCH),
-                right: Math.round(pageMargin.right * TWIPS_PER_INCH),
-                bottom: Math.round(pageMargin.bottom * TWIPS_PER_INCH),
-                left: Math.round(pageMargin.left * TWIPS_PER_INCH),
-              },
-              borders: getDocxBorder(formatting.pageBorder)
-            },
-          },
-          children: paragraphs,
-        },
-      ],
-    })
-
-    const blob = await Packer.toBlob(doc)
-    saveAs(blob, filename)
-  } catch (error) {
-    console.error('Error exporting to DOCX:', error)
-    throw error
-  }
-}
-
-export function convertMarkdownToHtml(markdown: string, formatting: FormattingSettings = defaultFormatting): string {
+// Added isWebPreview parameter!
+export function convertMarkdownToHtml(markdown: string, formatting: FormattingSettings = defaultFormatting, isWebPreview: boolean = false): string {
   let html = normalizeAssignmentContent(markdown)
 
   const justifyStyle = formatting.justifyAlignment ? 'text-align: justify;' : '';
@@ -554,8 +338,8 @@ export function convertMarkdownToHtml(markdown: string, formatting: FormattingSe
     return `<p class="my-3 leading-relaxed text-slate-900 dark:text-slate-100" style="${bodyStyle}">${para}</p>`
   })
   
-  // Document Preview UI border styling 
-  const borderStyle = formatting.pageBorder !== 'none' 
+  // HTML Border sirf tab lagay ga jab Preview open ho, export mein nahi.
+  const borderStyle = (isWebPreview && formatting.pageBorder !== 'none')
     ? `border: ${formatting.pageBorder === 'double' ? '4px double' : formatting.pageBorder === 'dashed' ? '2px dashed' : formatting.pageBorder === 'dotted' ? '2px dotted' : '2px solid'} #333; padding: 2rem; margin: 1rem 0;`
     : '';
 
