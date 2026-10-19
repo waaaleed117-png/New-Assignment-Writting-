@@ -18,6 +18,9 @@ export type PageMarginId = 'normal' | 'narrow' | 'moderate' | 'wide'
 
 export type PageSizeId = 'a4' | 'a3' | 'letter' | 'legal' | 'executive'
 
+// Border ke styles MS Word ki tarah define kar diye hain
+export type PageBorderId = 'none' | 'solid' | 'dashed' | 'dotted' | 'double'
+
 export interface FormattingSettings {
   bodyFont: string
   bodySize: number
@@ -25,6 +28,10 @@ export interface FormattingSettings {
   headingSize: number
   pageMargin: PageMarginId
   pageSize: PageSizeId
+  // Yeh 3 naye options add kiye hain
+  headingBold: boolean
+  justifyAlignment: boolean
+  pageBorder: PageBorderId
 }
 
 export interface UserProfile {
