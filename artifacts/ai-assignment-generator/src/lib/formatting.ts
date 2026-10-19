@@ -1,4 +1,4 @@
-import type { FormattingSettings, PageMarginId, PageSizeId } from '@/lib/types'
+import type { FormattingSettings, PageMarginId, PageSizeId, PageBorderId } from '@/lib/types'
 
 export const FONT_OPTIONS = [
   'Arial',
@@ -51,6 +51,20 @@ export const PAGE_SIZE_OPTIONS: readonly PageSizePreset[] = [
   { id: 'executive', label: 'Executive', width: 7.25, height: 10.5 },
 ] as const
 
+// Border Options Array - Dropdown ke liye
+export interface PageBorderPreset {
+  id: PageBorderId
+  label: string
+}
+
+export const PAGE_BORDER_OPTIONS: readonly PageBorderPreset[] = [
+  { id: 'none', label: 'None' },
+  { id: 'solid', label: 'Solid' },
+  { id: 'dashed', label: 'Dashed' },
+  { id: 'dotted', label: 'Dotted' },
+  { id: 'double', label: 'Double' },
+] as const
+
 const FALLBACK_MARGIN = PAGE_MARGIN_OPTIONS[0]
 const FALLBACK_SIZE = PAGE_SIZE_OPTIONS[0]
 
@@ -80,4 +94,7 @@ export const defaultFormatting: FormattingSettings = {
   headingSize: 18,
   pageMargin: 'normal',
   pageSize: 'a4',
+  headingBold: true,
+  justifyAlignment: false,
+  pageBorder: 'none',
 }
