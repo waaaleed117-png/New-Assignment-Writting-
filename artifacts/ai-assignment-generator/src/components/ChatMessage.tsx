@@ -31,7 +31,6 @@ export default function ChatMessage({ message, formatting = defaultFormatting }:
   const handleDownloadPDF = async () => {
     try {
       const { exportToPDF } = await import('@/lib/export')
-      // PDF export mein false pass karna zaroori hai taake HTML ka double border na aaye
       const htmlContent = convertMarkdownToHtml(message.content, formatting, false)
       await exportToPDF(htmlContent, 'assignment.pdf', formatting)
       toast.success('PDF downloaded successfully')
